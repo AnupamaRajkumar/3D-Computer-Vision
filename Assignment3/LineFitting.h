@@ -11,11 +11,12 @@ using namespace cv;
 
 class LineFit {
 public:
-	LineFit(Mat& img);
+	LineFit(Mat& img, int iterations);
 	void RobustFitting();
 	
 private:
 	Mat img;
+	int iterations;
 
 	Mat EdgeDetector();
 	void FitLineRANSAC(const vector<Point2d> &points_, const vector<int> &mask_, vector<int> &inliers_, Mat &line_,

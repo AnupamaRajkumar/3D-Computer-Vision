@@ -1,7 +1,8 @@
 #include "LineFitting.h"
 
-LineFit::LineFit(Mat& img) {
+LineFit::LineFit(Mat& img, int iterations) {
 	this->img = img;
+	this->iterations = iterations;
 }
 
 Mat LineFit::EdgeDetector() {
@@ -14,7 +15,7 @@ Mat LineFit::EdgeDetector() {
 	Mat filtImg = Mat::zeros(img.size(), img.type());
 	/*converting image to grayscale*/
 	cvtColor(img, filtImg, COLOR_BGR2GRAY);
-	GaussianBlur(filtImg, filtImg, kernel.size(), 0, 0);
+	//GaussianBlur(filtImg, filtImg, kernel.size(), 0, 0);
 
 	/*step 2 : Thresholding*/
 	double maxVal = 255.;
@@ -24,10 +25,9 @@ Mat LineFit::EdgeDetector() {
 	/*Step 3 : Edge filtering*/
 	Canny(binImg, edgeImg, 0, 2, 3);
 
-	//imshow("Edge", edgeImg);
+	imwrite("Edge.png", edgeImg);
 	return edgeImg;
 }
-
 vector<Point2d> LineFit::GeneratePoints(Mat& edge) {
 	vector<Point2d> points;
 	Mat locations;
@@ -52,9 +52,11 @@ void LineFit::RobustFitting() {
 	vector<vector<int>> inliers;
 	vector<Mat> bestLines;
 	int threshold = 10;
-	int numOfIterations = 1000;
-	int minInlierNum = 200;
-	this->SequentialRANSAC(points, inliers, bestLines, threshold, 0.99999999999999, numOfIterations, minInlierNum);
+	int numOfIterations = iterations;
+	int minInlierNum = 700;
+	this->SequentialRANSAC(points, inliers, bestLines, threshold, 0.999999, numOfIterations, minInlierNum);
+
+	cout << "Number of lines found:" << bestLines.size() << endl;
 
 	for (int lineIdx = 0; lineIdx < bestLines.size(); lineIdx++) {
 
@@ -79,9 +81,10 @@ void LineFit::RobustFitting() {
 		}
 		averageError /= inliers[lineIdx].size();
 
-		printf("Avg. RANSAC error = %f px\n", averageError);
+		cout << "Average RANSAC error for line " << lineIdx + 1 << " is : " << averageError << endl;
 	}
 	imshow("Final result", fitImg);
+	imwrite("RobustFitting.png", fitImg);
 }
 
 void LineFit::SequentialRANSAC(vector<Point2d> &points, vector<vector<int>> &inliers, vector<Mat> &lines, double threshold,
@@ -140,7 +143,7 @@ void LineFit::FitLineRANSAC(const vector<Point2d> &points_, const vector<int> &m
 
 	cv::Mat tmp_image;
 	size_t maximumIterations = maximum_iteration_number_;
-	cout << maximumIterations << endl;
+
 	while (iterationNumber++ < maximumIterations)
 	{
 		// 1. Select a minimal sample, i.e., in this case, 2 random points.

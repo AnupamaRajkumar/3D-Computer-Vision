@@ -22,8 +22,10 @@ int main(int argc, char** argv)
 		std::cerr << "No image data" << endl;
 		return EXIT_FAILURE;
 	}
-
-	LineFit line(img);
+	int iterations = 100;
+	cout << "Enter the number of iterations desired" << endl;
+	cin >> iterations;
+	LineFit line(img, iterations);
 	line.RobustFitting();
 		
 	cv::waitKey(0);
