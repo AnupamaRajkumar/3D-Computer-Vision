@@ -114,11 +114,75 @@ void LineFit::SequentialRANSAC(vector<Point2d> &points, vector<vector<int>> &inl
 			lines.resize(lines.size() - 1);
 			break;
 		}
+		/*optimising using least sqaure fitting*/
+		this->FitLineLSQ(&points,
+			inliers.back(),
+			lines.back());
 
 		for (const auto &inlierIdx : inliers.back())
 			mask[inlierIdx] = lineIdx + 1;
 
 	}
+}
+
+// Apply Least-Squares line fitting (PCL).
+void LineFit::FitLineLSQ(const vector<Point2d> * const points, vector<int> &inliers, Mat &line)
+{
+	vector<Point2d> normalizedPoints;
+	normalizedPoints.reserve(inliers.size());
+
+	// Calculating the mass point of the points
+	Point2d masspoint(0, 0);
+
+	for (const auto &inlierIdx : inliers)
+	{
+		masspoint += points->at(inlierIdx);
+		normalizedPoints.emplace_back(points->at(inlierIdx));
+	}
+	masspoint = masspoint * (1.0 / inliers.size());
+
+	// Move the point cloud to have the origin in their mass point
+	for (auto &point : normalizedPoints)
+		point -= masspoint;
+
+	// Calculating the average distance from the origin
+	double averageDistance = 0.0;
+	for (auto &point : normalizedPoints)
+	{
+		averageDistance += cv::norm(point);
+		// norm(point) = sqrt(point.x * point.x + point.y * point.y)
+	}
+
+	averageDistance /= normalizedPoints.size();
+	const double ratio = sqrt(2) / averageDistance;
+
+	// Making the average distance to be sqrt(2)
+	for (auto &point : normalizedPoints)
+		point *= ratio;
+
+	// Now, we should solve the equation.
+	cv::Mat A(normalizedPoints.size(), 2, CV_64F);
+
+	// Building the coefficient matrix
+	for (size_t pointIdx = 0; pointIdx < normalizedPoints.size(); ++pointIdx)
+	{
+		const size_t &rowIdx = pointIdx;
+
+		A.at<double>(rowIdx, 0) = normalizedPoints[pointIdx].x;
+		A.at<double>(rowIdx, 1) = normalizedPoints[pointIdx].y;
+	}
+
+	cv::Mat evals, evecs;
+	cv::eigen(A.t() * A, evals, evecs);
+
+	const cv::Mat &normal = evecs.row(1);
+	const double &a = normal.at<double>(0),
+		&b = normal.at<double>(1);
+	const double c = -(a * masspoint.x + b * masspoint.y);
+
+	line.at<double>(0) = a;
+	line.at<double>(1) = b;
+	line.at<double>(2) = c;
 }
 
 
