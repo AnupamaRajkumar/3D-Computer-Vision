@@ -15,7 +15,7 @@ Mat LineFit::EdgeDetector() {
 	Mat filtImg = Mat::zeros(img.size(), img.type());
 	/*converting image to grayscale*/
 	cvtColor(img, filtImg, COLOR_BGR2GRAY);
-	//GaussianBlur(filtImg, filtImg, kernel.size(), 0, 0);
+	GaussianBlur(filtImg, filtImg, kernel.size(), 0, 0);
 
 	/*step 2 : Thresholding*/
 	double maxVal = 255.;
@@ -51,9 +51,9 @@ void LineFit::RobustFitting() {
 	/*Fit the line robustly*/
 	vector<vector<int>> inliers;
 	vector<Mat> bestLines;
-	int threshold = 10;
+	int threshold = 5;
 	int numOfIterations = iterations;
-	int minInlierNum = 700;
+	int minInlierNum = 200;
 	this->SequentialRANSAC(points, inliers, bestLines, threshold, 0.999999, numOfIterations, minInlierNum);
 
 	cout << "Number of lines found:" << bestLines.size() << endl;
@@ -70,7 +70,7 @@ void LineFit::RobustFitting() {
 			Point2d(0, -c2 / b2),
 			Point2d(fitImg.cols, (-a2 * fitImg.cols - c2) / b2),
 			cv::Scalar(0, 0, 255),
-			2);
+			1);
 
 		// Calculate the error or the Least Squares Fitting line
 		double averageError = 0.0;
@@ -120,6 +120,7 @@ void LineFit::SequentialRANSAC(vector<Point2d> &points, vector<vector<int>> &inl
 
 	}
 }
+
 
 // Apply RANSAC to fit points to a 2D line
 void LineFit::FitLineRANSAC(const vector<Point2d> &points_, const vector<int> &mask_, vector<int> &inliers_, Mat &line_,
