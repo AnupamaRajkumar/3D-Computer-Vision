@@ -31,6 +31,22 @@ void loRANSAC::LocallyOptimisedRANSAC(int option) {
 	for (int i = 0; i < inliers.size(); i++) {
 		points[inliers[i]].green = 255;
 	}
+
+	// Calculate the error or the Least Squares Fitting line
+	double a = plane.at<double>(0);
+	double b = plane.at<double>(1);
+	double c = plane.at<double>(2);
+	double d = plane.at<double>(3);
+	cout << a << " " << b << " " << c << " " << d << endl;
+	double averageError = 0.0;
+	for(int inlierIdx = 0; inlierIdx < inliers.size(); inlierIdx++){
+		Point3d p = points[inliers[inlierIdx]].point;
+		double distance = abs(a * p.x + b * p.y + c * p.z + d);
+		averageError += distance;
+	}
+	averageError /= inliers.size();
+
+	cout << "Average RANSAC error for plane is : " << averageError << endl;
 	/*write the inlier values to xyz file*/
 	this->WriteDataPoints(points);
 }
@@ -244,12 +260,24 @@ void loRANSAC::FitLoRANSAC(const vector<allPoints>& points_, int maximum_iterati
 			inliers.resize(0);
 			int loIterationNum = 0;
 			size_t maxLoIterationNum = maximum_iteration_number_;
-			double a = 0.;
-			double b = 0.;
-			double c = 0.;
-			double d = 0.;
 			switch (option) {
 			case 1:
+				/*find new model parameters for the best inliers based on least square fitting*/
+				this->FitPlaneLSQ(points_, bestInliers, bestPlane);
+				a = bestPlane.at<double>(0);
+				b = bestPlane.at<double>(1);
+				c = bestPlane.at<double>(2);
+				d = bestPlane.at<double>(3);
+				// Update the maximum iteration number
+				maximumIterations = GetIterationNumber(
+					static_cast<double>(bestInliers.size()) / static_cast<double>(points_.size()),
+					confidence_,
+					kSampleSize);
+
+				//printf("Inlier number = %d\n", bestInliers.size());
+				cout << "Inlier number :" << bestInliers.size() << " max iterations :" << maximumIterations << endl;
+				break;
+			case 2:
 				/*find new model parameters for the best inliers based on least square fitting*/
 				this->FitPlaneLSQ(points_, bestInliers, bestPlane);
 				a = bestPlane.at<double>(0);
@@ -306,11 +334,12 @@ void loRANSAC::FitLoRANSAC(const vector<allPoints>& points_, int maximum_iterati
 				cout << "Inlier number :" << bestInliers.size() << " max iterations :" << maximumIterations << endl;
 				bestInliers = bestLoInliers;
 				break;
-			case 2:
+			case 3:
 				bestPlane.at<double>(0) = a;
 				bestPlane.at<double>(1) = b;
 				bestPlane.at<double>(2) = c;
-
+				bestPlane.at<double>(3) = d;
+				//cout << a << " " << b << " " << c << " " << d << endl;
 				// Update the maximum iteration number
 				maximumIterations = GetIterationNumber(
 					static_cast<double>(bestInliers.size()) / static_cast<double>(points_.size()),
