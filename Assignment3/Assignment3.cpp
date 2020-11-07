@@ -6,27 +6,54 @@
 5. Draw fitted line to the original image by red
 */
 
-
 #include "LineFitting.h"
+#include "OptimisedRANSAC.h"
 
 int main(int argc, char** argv)
 {
-	if (argc < 2) {
-		std::cerr << "Input image not found" << endl;
+	if (argc < 3) {
+		std::cerr << "Input format : Input image Lidar scan" << endl;
 		return EXIT_FAILURE;
 	}
 
+	int choice = 1;
+	cout << "-----------Robust estimation menu----------\n";
+	cout << "1. Robust line fitting using RANSAC" << endl;
+	cout << "2. Robust plane fitting using LO RANSAC" << endl;
+	cout << "Please enter your choice (1/2):" << endl;
+	cin >> choice;
 	Mat img = imread(argv[1]);
+	int iterations = 100;
+	int option = 1;
 
+
+	cout << "Enter the number of iterations desired" << endl;
+	cin >> iterations;
 	if (!img.data) {
 		std::cerr << "No image data" << endl;
 		return EXIT_FAILURE;
-	}
-	int iterations = 100;
-	cout << "Enter the number of iterations desired" << endl;
-	cin >> iterations;
+	}	
+	
 	LineFit line(img, iterations);
-	line.RobustFitting();
+	loRANSAC loransac(argv[2], iterations);
+	switch (choice) {
+		case 1:	
+			line.RobustFitting();
+			break;
+		case 2:
+			cout << "Optimisation method menu:" << endl;
+			cout << "1. Least Square Optimisation:" << endl;
+			cout << "2. No optimisation" << endl;
+			cout << "Enter your choice (1/2):" << endl;
+			cin >> option;
+			loransac.LocallyOptimisedRANSAC(option);
+			break;
+		default:
+			cout << "Enter a valid choice!! (1 or 2)" << endl;
+			break;
+	}
+
+
 		
 	cv::waitKey(0);
 	return 0;
