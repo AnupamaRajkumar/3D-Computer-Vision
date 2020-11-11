@@ -28,6 +28,7 @@ Mat LineFit::EdgeDetector() {
 	imwrite("Edge.png", edgeImg);
 	return edgeImg;
 }
+
 vector<Point2d> LineFit::GeneratePoints(Mat& edge) {
 	vector<Point2d> points;
 	Mat locations;

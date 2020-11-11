@@ -43,7 +43,8 @@ int main(int argc, char** argv)
 		case 2:
 			cout << "Optimisation method menu:" << endl;
 			cout << "1. Least Square Optimisation:" << endl;
-			cout << "2. No optimisation" << endl;
+			cout << "2. Iterative Least Square Optimisation:" << endl;
+			cout << "3. No optimisation" << endl;
 			cout << "Enter your choice (1/2):" << endl;
 			cin >> option;
 			loransac.LocallyOptimisedRANSAC(option);

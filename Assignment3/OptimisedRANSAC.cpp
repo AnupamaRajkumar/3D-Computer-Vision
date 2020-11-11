@@ -22,7 +22,7 @@ void loRANSAC::LocallyOptimisedRANSAC(int option) {
 	/*Fit the plane*/
 	vector<int> inliers;
 	double threshold = 0.009;
-	double loThreshold = 2.;
+	double loThreshold = 0.5;			
 	double confidence = 0.9999;
 	Mat plane;
 	this->FitLoRANSAC(points, this->iterations, threshold, loThreshold, confidence, inliers, plane, option);
@@ -180,10 +180,12 @@ void loRANSAC::FitLoRANSAC(const vector<allPoints>& points_, int maximum_iterati
 	// The parameters of the best plane
 	Mat bestPlane(4, 1, CV_64F);
 	//Local optimisation parameters
-	vector<int> bestLoInliers, loInliers;
+	vector<int> bestLoInliers, loInliers, iterInlier;
 	Mat bestLoPlane(4, 1, CV_64F);
+	Mat bestInnerPlane(4, 1, CV_64F);
 	bestLoInliers.reserve(bestInliers.size());
 	loInliers.reserve(bestInliers.size());
+	iterInlier.reserve(bestInliers.size());
 
 	// The sample size, i.e., 3 for plane
 	constexpr int kSampleSize = 3;
@@ -260,6 +262,8 @@ void loRANSAC::FitLoRANSAC(const vector<allPoints>& points_, int maximum_iterati
 			inliers.resize(0);
 			int loIterationNum = 0;
 			size_t maxLoIterationNum = maximum_iteration_number_;
+			float epsilon = 0.00001;
+			float innerThreshold = sqrt(2);
 			switch (option) {
 			case 1:
 				/*find new model parameters for the best inliers based on least square fitting*/
@@ -292,47 +296,54 @@ void loRANSAC::FitLoRANSAC(const vector<allPoints>& points_, int maximum_iterati
 					//cout << bestInliers[pointIdx] << " " << point.x << " " << point.y << " " << point.z << endl;
 					const double distance = abs(a * point.x + b * point.y + c * point.z + d);
 					//cout << distance << endl;
-					if (distance < loThreshold)
+					if (distance < innerThreshold)
 					{
 						loInliers.emplace_back(bestInliers[pointIdx]);
 					}
 				}
-				while (loIterationNum++ < maxLoIterationNum) {			
-					// 4. Store the inlier number and the line parameters if it is better than the previous best. 
-					if (loInliers.size() > bestLoInliers.size())
+				iterInlier = loInliers;
+				while ((innerThreshold - loThreshold) > epsilon) {
+					this->FitPlaneLSQ(points_, iterInlier, bestInnerPlane);
+					a = bestInnerPlane.at<double>(0);
+					b = bestInnerPlane.at<double>(1);
+					c = bestInnerPlane.at<double>(2);
+					d = bestInnerPlane.at<double>(3);
+					//cout << a << " " << b << " " << c << " " << d << endl;
+					vector<int> val;
+					val.reserve(iterInlier.size());
+					for (size_t pointIdx = 0; pointIdx < iterInlier.size(); ++pointIdx)
 					{
-						bestLoInliers.swap(loInliers);
-						loInliers.clear();
-						loInliers.resize(0);
-
-						bestLoPlane.at<double>(0) = a;
-						bestLoPlane.at<double>(1) = b;
-						bestLoPlane.at<double>(2) = c;
-						bestLoPlane.at<double>(3) = d;
-
-						// Update the maximum iteration number
-						maximumIterations = GetIterationNumber(
-							static_cast<double>(bestLoInliers.size()) / static_cast<double>(bestInliers.size()),
-							confidence_,
-							kSampleSize);
-
-						//printf("Inlier number = %d\n", bestInliers.size());
-						cout << "local optimised inlier number :" << bestLoInliers.size() << " max local optimised iterations :" << maximumIterations << endl;
+						const Point3d &point = points_[iterInlier[pointIdx]].point;
+						//cout << bestInliers[pointIdx] << " " << point.x << " " << point.y << " " << point.z << endl;
+						const double distance = abs(a * point.x + b * point.y + c * point.z + d);
+						//cout << distance << endl;
+						//cout << innerThreshold << endl;
+						if (distance < innerThreshold)
+						{
+							val.emplace_back(iterInlier[pointIdx]);
+						}
 					}
+					iterInlier.clear();
+					iterInlier = val;
+					innerThreshold -= loThreshold;
+					//cout << innerThreshold << endl;
 				}
-				bestPlane.at<double>(0) = bestLoPlane.at<double>(0);
-				bestPlane.at<double>(1) = bestLoPlane.at<double>(1);
-				bestPlane.at<double>(2) = bestLoPlane.at<double>(2);
-				bestPlane.at<double>(3) = bestLoPlane.at<double>(3);
+				//cout << iterInlier.size() << endl;
+				//cout << a << " " << b << " " << c << " " << d << endl;
+				bestPlane.at<double>(0) = a;
+				bestPlane.at<double>(1) = b;
+				bestPlane.at<double>(2) = c;
+				bestPlane.at<double>(3) = d;
+
 				// Update the maximum iteration number
 				maximumIterations = GetIterationNumber(
-					static_cast<double>(bestInliers.size()) / static_cast<double>(points_.size()),
+					static_cast<double>(iterInlier.size()) / static_cast<double>(points_.size()),
 					confidence_,
 					kSampleSize);
 
 				//printf("Inlier number = %d\n", bestInliers.size());
-				cout << "Inlier number :" << bestInliers.size() << " max iterations :" << maximumIterations << endl;
-				bestInliers = bestLoInliers;
+				cout << "Inlier number :" << iterInlier.size() << " max iterations :" << maximumIterations << endl;
+				bestInliers = iterInlier;
 				break;
 			case 3:
 				bestPlane.at<double>(0) = a;
