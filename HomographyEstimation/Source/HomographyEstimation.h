@@ -32,7 +32,7 @@ private:
 
 	void PlanarHomography();
 	void PanoramicImaging();
-	void FeatureMatching();
+	void FeatureMatching(Mat& image1, Mat& image2);
 	void LoadPanoramicImages(vector<Mat>& panoramicImages);
 	Mat RobustFitting();
 	void TransformImage(Mat origImg, Mat& newImage, Mat tr, bool isPerspective, bool isInvTrNeeded);

@@ -33,7 +33,7 @@ void Homographies::HomographyMenu() {
 
 void Homographies::PlanarHomography() {
 	/*step 1 : Perform Feature Matching*/
-	this->FeatureMatching();
+	this->FeatureMatching(this->im1, this->im2);
 	/*step 2 : Robustify these points using standard RANSAC*/
 	Mat bestHomography;
 	bestHomography = this->RobustFitting();
@@ -46,34 +46,52 @@ void Homographies::PlanarHomography() {
 }
 
 void Homographies::PanoramicImaging(){
+
 	/*step 1 : Load panoramic images*/
 	vector<Mat> panoramicImages;
 	this->LoadPanoramicImages(panoramicImages);
-	/*step 2 : Perform Feature Matching*/
-	this->FeatureMatching();
-	/*step 3 : Robustify these points using standard RANSAC*/
-	Mat bestHomography;
-	bestHomography = this->RobustFitting();
-	cout << "Best homography found" << endl;
-	/*step 3: Apply linear homography estimation and stitch the images together*/
-	Mat transformedImage = Mat::zeros(1.5 * this->im1.size().height, 1.5 * this->im1.size().width, this->im1.type());
-	this->TransformImage(this->im2, transformedImage, Mat::eye(3, 3, CV_32F), true, true);
-	this->TransformImage(this->im1, transformedImage, bestHomography, true, true);
-
+	Mat transformedImage = Mat::zeros(2 * panoramicImages[0].size().height, 
+									  2 * panoramicImages[0].size().width, 
+								      panoramicImages[0].type());
+	Mat transformedImage1 = transformedImage.clone();
+	/*step 4: Apply linear homography estimation and stitch the images together*/
+	for (int i = 0; i < panoramicImages.size() - 1; i++) {
+		cout << i << endl;
+		/*step 2 : Perform Feature Matching*/
+		this->FeatureMatching(panoramicImages[i], panoramicImages[i + 1]);
+		/*step 3 : Robustify these points using standard RANSAC*/
+		Mat bestHomography;
+		bestHomography = this->RobustFitting();
+		cout << "Best homography found" << endl;
+		if (i == 0) {		
+			this->TransformImage(panoramicImages[i+1], transformedImage, 
+								 Mat::eye(3, 3, CV_32F), true, true);
+			this->TransformImage(panoramicImages[i], transformedImage, bestHomography, true, true);
+		}
+		else {
+			Mat transformedImage1 = Mat::zeros(transformedImage.size().height, 
+											   transformedImage.size().width, 
+											   transformedImage.type());
+			
+			this->TransformImage(transformedImage, transformedImage1, Mat::eye(3, 3, CV_32F), true, true);;
+			this->TransformImage(panoramicImages[i + 1], transformedImage1, bestHomography, true, false);;
+			transformedImage = transformedImage1.clone();
+			waitKey(0);
+		}
+	}
 	imwrite("PanoramicStitching.png", transformedImage);
 	imshow("PanoramicStitching", transformedImage);
-
 }
 
 /*Akaze feature tracking referred from https://docs.opencv.org/3.4/db/d70/tutorial_akaze_matching.html */
-void Homographies::FeatureMatching() {
+void Homographies::FeatureMatching(Mat& image1, Mat& image2) {
 	vector<KeyPoint> kpts1, kpts2;
 	Mat desc1, desc2;
 	float nn_match_ratio = 0.8f;
 
 	Ptr<AKAZE> akaze = AKAZE::create();
-	akaze->detectAndCompute(this->im1, noArray(), kpts1, desc1);
-	akaze->detectAndCompute(this->im2, noArray(), kpts2, desc2);
+	akaze->detectAndCompute(image1, noArray(), kpts1, desc1);
+	akaze->detectAndCompute(image2, noArray(), kpts2, desc2);
 
 	BFMatcher matcher(NORM_HAMMING);
 	vector<vector<DMatch>> nn_matches;
@@ -345,14 +363,15 @@ void Homographies::LoadPanoramicImages(vector<Mat>& panoramicImages) {
 	fs::recursive_directory_iterator iter(this->folderName);
 	fs::recursive_directory_iterator end;
 	while (iter != end) {
-		Mat img = imread(iter->path().string());
+		Mat img = imread(iter->path().string(), 1);
 		if (!img.data) {
 			cout << "ERROR: Cannot find labelled image" << endl;
 			cout << "Press enter to exit..." << endl;
 			cin.get();
 			exit(0);
 		}
-		img.convertTo(img, CV_32FC1);
+		//img.convertTo(img, CV_32FC1);
+		resize(img, img, cv::Size(), 0.5, 0.5);
 		panoramicImages.push_back(img);
 
 		error_code ec;
