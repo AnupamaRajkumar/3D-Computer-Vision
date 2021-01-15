@@ -11,8 +11,9 @@
 
 int main(int argc, char** argv)
 {
-	if (argc < 3) {
-		cerr << "Enter two images for homography estimation";
+	if (argc < 4) {
+		cerr << "Looking for 3 inputs" << endl;
+		cerr << "Enter two images for homography estimation and folder name containing images for panoramic stitching" << endl;
 		exit(0);
 	}
 	
@@ -20,12 +21,15 @@ int main(int argc, char** argv)
 	im1 = imread(argv[1], 1);
 	im2 = imread(argv[2], 1);
 
+	string folderName;
+	folderName = argv[3];
+
 	/*resize the image to 50% of it's original size so as to reduce
 	the size of the keypoint array*/
 	resize(im1, im1, cv::Size(), 0.5, 0.5);
 	resize(im2, im2, cv::Size(), 0.5, 0.5);
 
-	Homographies homography(im1, im2);
+	Homographies homography(im1, im2, folderName);
 
 	waitKey(0);
 	return 0;

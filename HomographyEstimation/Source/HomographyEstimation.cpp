@@ -1,8 +1,9 @@
 #include "HomographyEstimation.h"
 
-Homographies::Homographies(Mat& im1, Mat& im2) {
+Homographies::Homographies(Mat& im1, Mat& im2, string folderName) {
 	this->im1 = im1.clone();
 	this->im2 = im2.clone();
+	this->folderName = folderName;
 
 	/*Invoke the homographies menu*/
 	this->HomographyMenu();
@@ -39,14 +40,29 @@ void Homographies::PlanarHomography() {
 	cout << "Best homography found" << endl;
 	/*step 3 : Apply linear homography estimation*/
 	Mat transformedImage = Mat::zeros(this->im1.size().height, this->im1.size().width, this->im1.type());
-	this->TransformImage(this->im2, transformedImage, bestHomography, true);
+	this->TransformImage(this->im2, transformedImage, bestHomography, true, false);
 	imwrite("LinearHomography.png", transformedImage);
 	imshow("Linear Homography", transformedImage);
 }
 
 void Homographies::PanoramicImaging(){
-	/*step 1 : Perform Feature Matching*/
+	/*step 1 : Load panoramic images*/
+	vector<Mat> panoramicImages;
+	this->LoadPanoramicImages(panoramicImages);
+	/*step 2 : Perform Feature Matching*/
 	this->FeatureMatching();
+	/*step 3 : Robustify these points using standard RANSAC*/
+	Mat bestHomography;
+	bestHomography = this->RobustFitting();
+	cout << "Best homography found" << endl;
+	/*step 3: Apply linear homography estimation and stitch the images together*/
+	Mat transformedImage = Mat::zeros(1.5 * this->im1.size().height, 1.5 * this->im1.size().width, this->im1.type());
+	this->TransformImage(this->im2, transformedImage, Mat::eye(3, 3, CV_32F), true, true);
+	this->TransformImage(this->im1, transformedImage, bestHomography, true, true);
+
+	imwrite("PanoramicStitching.png", transformedImage);
+	imshow("PanoramicStitching", transformedImage);
+
 }
 
 /*Akaze feature tracking referred from https://docs.opencv.org/3.4/db/d70/tutorial_akaze_matching.html */
@@ -283,28 +299,20 @@ Mat Homographies::CalcHomography(vector<pair<Point2f, Point2f> >& pointPairs) {
 	}
 
 	Mat eVecs(9, 9, CV_32F), eVals(9, 9, CV_32F);
-	//cout << A << endl;
 	eigen(A.t() * A, eVals, eVecs);
-
-	//cout << eVals << endl;
-	//cout << eVecs << endl;
 
 	Mat H(3, 3, CV_32F);
 	for (int i = 0; i < 9; i++) H.at<float>(i / 3, i % 3) = eVecs.at<float>(8, i);
-
-	//cout << H << endl;
 
 	// Data normalization
 	H = norm.T2D_xDash.inv()*H*norm.T2D_x;
 	//Normalize:
 	H = H * (1.0 / H.at<float>(2, 2));
-	//cout << H << endl;
 
 	return H;
 }
 
-void Homographies::TransformImage(Mat origImg, Mat& newImage, Mat tr, bool isPerspective) {
-	Mat invTr = tr.inv();
+void Homographies::TransformImage(Mat origImg, Mat& newImage, Mat tr, bool isPerspective, bool isInvTrNeeded) {
 	const int WIDTH = origImg.cols;
 	const int HEIGHT = origImg.rows;
 
@@ -317,10 +325,12 @@ void Homographies::TransformImage(Mat origImg, Mat& newImage, Mat tr, bool isPer
 		pt.at<float>(1, 0) = y;
 		pt.at<float>(2, 0) = 1.0;
 
-		Mat ptTransformed = tr * pt;
-		//        cout <<pt <<endl;
-		//        cout <<invTr <<endl;
-		//        cout <<ptTransformed <<endl;
+		Mat ptTransformed;
+		if (isInvTrNeeded)
+			ptTransformed = tr.inv() * pt;
+		else
+			ptTransformed = tr * pt;
+
 		if (isPerspective) ptTransformed = (1.0 / ptTransformed.at<float>(2, 0)) * ptTransformed;
 
 		int newX = round(ptTransformed.at<float>(0, 0));
@@ -328,5 +338,27 @@ void Homographies::TransformImage(Mat origImg, Mat& newImage, Mat tr, bool isPer
 
 		if ((newX >= 0) && (newX < WIDTH) && (newY >= 0) && (newY < HEIGHT))
 			newImage.at<Vec3b>(y, x) = origImg.at<Vec3b>(newY, newX);
+	}
+}
+
+void Homographies::LoadPanoramicImages(vector<Mat>& panoramicImages) {
+	fs::recursive_directory_iterator iter(this->folderName);
+	fs::recursive_directory_iterator end;
+	while (iter != end) {
+		Mat img = imread(iter->path().string());
+		if (!img.data) {
+			cout << "ERROR: Cannot find labelled image" << endl;
+			cout << "Press enter to exit..." << endl;
+			cin.get();
+			exit(0);
+		}
+		img.convertTo(img, CV_32FC1);
+		panoramicImages.push_back(img);
+
+		error_code ec;
+		iter.increment(ec);
+		if (ec) {
+			std::cerr << "Error while accessing:" << iter->path().string() << "::" << ec.message() << "\n";
+		}
 	}
 }
