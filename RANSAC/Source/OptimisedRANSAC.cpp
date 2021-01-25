@@ -21,7 +21,7 @@ void loRANSAC::LocallyOptimisedRANSAC(int option) {
 	cout << "Number of points: " << points.size() << endl;
 	/*Fit the plane*/
 	vector<int> inliers;
-	double threshold = 0.009;
+	double threshold = 0.05;
 	double loThreshold = 0.5;			
 	double confidence = 0.9999;
 	Mat plane;
@@ -32,14 +32,13 @@ void loRANSAC::LocallyOptimisedRANSAC(int option) {
 		points[inliers[i]].green = 255;
 	}
 
-	// Calculate the error or the Least Squares Fitting line
 	double a = plane.at<double>(0);
 	double b = plane.at<double>(1);
 	double c = plane.at<double>(2);
 	double d = plane.at<double>(3);
 	cout << a << " " << b << " " << c << " " << d << endl;
 	double averageError = 0.0;
-	for(int inlierIdx = 0; inlierIdx < inliers.size(); inlierIdx++){
+	for (int inlierIdx = 0; inlierIdx < inliers.size(); inlierIdx++) {
 		Point3d p = points[inliers[inlierIdx]].point;
 		double distance = abs(a * p.x + b * p.y + c * p.z + d);
 		averageError += distance;
@@ -47,6 +46,7 @@ void loRANSAC::LocallyOptimisedRANSAC(int option) {
 	averageError /= inliers.size();
 
 	cout << "Average RANSAC error for plane is : " << averageError << endl;
+
 	/*write the inlier values to xyz file*/
 	this->WriteDataPoints(points);
 }
@@ -129,18 +129,18 @@ void loRANSAC::FitPlaneLSQ(const vector<allPoints>& points_, vector<int>& inlier
 	for (auto &point : normalizedPoints)
 	{
 		averageDistance += cv::norm(point);
-		// norm(point) = sqrt(point.x * point.x + point.y * point.y)
+		// norm(point) = sqrt(point.x * point.x + point.y * point.y + point.z * point.z)
 	}
 
 	averageDistance /= normalizedPoints.size();
-	const double ratio = sqrt(2) / averageDistance;
+	const double ratio = sqrt(3) / averageDistance;
 
 	// Making the average distance to be sqrt(2)
 	for (auto &point : normalizedPoints)
 		point *= ratio;
 
 	// Now, we should solve the equation.
-	cv::Mat A(normalizedPoints.size(), 2, CV_64F);
+	cv::Mat A(normalizedPoints.size(), 3, CV_64F);
 
 	// Building the coefficient matrix
 	for (size_t pointIdx = 0; pointIdx < normalizedPoints.size(); ++pointIdx)
@@ -149,12 +149,13 @@ void loRANSAC::FitPlaneLSQ(const vector<allPoints>& points_, vector<int>& inlier
 
 		A.at<double>(rowIdx, 0) = normalizedPoints[pointIdx].x;
 		A.at<double>(rowIdx, 1) = normalizedPoints[pointIdx].y;
+		A.at<double>(rowIdx, 2) = normalizedPoints[pointIdx].z;
 	}
 
 	cv::Mat evals, evecs;
 	cv::eigen(A.t() * A, evals, evecs);
 
-	const cv::Mat &normal = evecs.row(1);
+	const cv::Mat &normal = evecs.row(2);
 
 	const double &a = normal.at<double>(0),
 				 &b = normal.at<double>(1),
@@ -225,16 +226,16 @@ void loRANSAC::FitLoRANSAC(const vector<allPoints>& points_, int maximum_iterati
 		const Point3d &p2 = points_[sample[1]].point; // Second point select	
 		const Point3d &p3 = points_[sample[2]].point; // Third point selected
 		Point3d v1 = p2 - p1; // Direction of the line 1
-		// cv::norm(v) = sqrt(v.x * v.x + v.y * v.y)
-		v1 = v1 / cv::norm(v1);
 		Point3d v2 = p3 - p1; //Direction of line 2
-		v2 = v2 / cv::norm(v2);
 		// Calculate parameters of plane by calculating normal to the lines
 		Point3d n;
-		n.x = (v1.y * v2.z) - (v2.y * v1.z);
-		n.y = -(v1.x * v2.z) + (v2.x * v1.z);
-		n.z = (v1.x * v2.y) - (v2.x * v1.y);
-		// To get c use a point from the line.
+		n = v1.cross(v2);
+		//n.x = (v1.y * v2.z) - (v2.y * v1.z);
+		//n.y = -(v1.x * v2.z) + (v2.x * v1.z);
+		//n.z = (v1.x * v2.y) - (v2.x * v1.y);
+		// cv::norm(v) = sqrt(n.x * n.x + n.y * n.y + n.z * n.z)
+		n = n / cv::norm(n);
+		// To get c use a point from the plane.
 		double a = n.x;
 		double b = n.y;
 		double c = n.z;
@@ -268,10 +269,6 @@ void loRANSAC::FitLoRANSAC(const vector<allPoints>& points_, int maximum_iterati
 			case 1:
 				/*find new model parameters for the best inliers based on least square fitting*/
 				this->FitPlaneLSQ(points_, bestInliers, bestPlane);
-				a = bestPlane.at<double>(0);
-				b = bestPlane.at<double>(1);
-				c = bestPlane.at<double>(2);
-				d = bestPlane.at<double>(3);
 				// Update the maximum iteration number
 				maximumIterations = GetIterationNumber(
 					static_cast<double>(bestInliers.size()) / static_cast<double>(points_.size()),
@@ -288,6 +285,7 @@ void loRANSAC::FitLoRANSAC(const vector<allPoints>& points_, int maximum_iterati
 				b = bestPlane.at<double>(1);
 				c = bestPlane.at<double>(2);
 				d = bestPlane.at<double>(3);
+
 				//cout << a << " " << b << " " << c << " " << d << endl;
 				loInliers.clear();
 				for (size_t pointIdx = 0; pointIdx < bestInliers.size(); ++pointIdx)
