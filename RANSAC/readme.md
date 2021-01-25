@@ -11,9 +11,9 @@
 
 ## Plane Fitting ##
 Point cloud of a garden\
-![Garden](https://github.com/AnupamaRajkumar/3D-Computer-Vision/blob/master/RANSAC/Output/Garden_LoRANSAC00.png)\
+![Garden](https://github.com/AnupamaRajkumar/3D-Computer-Vision/blob/master/RANSAC/Output/loransac_garden00.png)\
 Point cloud of a street\
-![Street](https://github.com/AnupamaRajkumar/3D-Computer-Vision/blob/master/RANSAC/Output/Street_LoRANSAC00.png)\
+![Street](https://github.com/AnupamaRajkumar/3D-Computer-Vision/blob/master/RANSAC/Output/loransac_street00.png)\
 Point cloud of a room\
-![Room](https://github.com/AnupamaRajkumar/3D-Computer-Vision/blob/master/RANSAC/Output/room_loRANSAC00.png)\
+![Room](https://github.com/AnupamaRajkumar/3D-Computer-Vision/blob/master/RANSAC/Output/loransac_room00.png)\
  
