@@ -1,8 +1,9 @@
 #include "StructureFromMotion.h"
 
-SFM::SFM(cv::Mat &image1, cv::Mat &image2) {
+SFM::SFM(cv::Mat &image1, cv::Mat &image2, char* matchedFile) {
 	this->image1 = image1;
 	this->image2 = image2;
+	this->matchedFile = matchedFile;
 	/*perform stereo reconstruction operation*/
 	this->SFMOperation();
 }
@@ -15,7 +16,15 @@ void SFM::SFMOperation() {
 	std::vector<cv::Point2d> source_points, destination_points; // Point correspondences
 	start = std::chrono::system_clock::now();
 
+	MatrixReaderWriter mtxrw = this->matchedFile;
+	for (int i = 0; i < mtxrw.columnNum; i++) {
+		source_points.push_back(cv::Point2d((double)mtxrw.data[i], (double)mtxrw.data[mtxrw.columnNum + i]));
+		destination_points.push_back(cv::Point2d((double)mtxrw.data[2 * mtxrw.columnNum + i], (double)mtxrw.data[3 * mtxrw.columnNum + i]));
+	}
+
+#if 0
 	this->FeatureMatching(this->image1, this->image2, source_points, destination_points);
+#endif
 	end = std::chrono::system_clock::now();
 	printTimes(start, end, "feature detection");
 
@@ -44,7 +53,7 @@ void SFM::SFMOperation() {
 		F, // The fundamental matrix
 		inliers, // The inliers of the fundamental matrix
 		0.99999, // The required confidence in the results 
-		20.0); // The inlier-outlier threshold
+		1.0); // The inlier-outlier threshold
 	end = std::chrono::system_clock::now();
 	printTimes(start, end, "RANSAC");
 
@@ -61,6 +70,15 @@ void SFM::SFMOperation() {
 		T2,
 		inliers);
 
+
+	std::cout << "Fundamental Matrix is:" << std::endl;
+	for (int r = 0; r < F.rows; r++) {
+		for (int c = 0; c < F.cols; c++) {
+			std::cout << F.at<double>(r, c) << " ";
+		}
+		std::cout << std::endl;
+	}
+
 	// Calibration matrix
 	start = std::chrono::system_clock::now();
 	cv::Mat K = (cv::Mat_<double>(3, 3) << 1262.620252, 0.000000, 934.611657,
@@ -69,6 +87,14 @@ void SFM::SFMOperation() {
 
 	// Essential matrix
 	cv::Mat E = K.t() * F * K;
+	std::cout << "Essential Matrix is:" << std::endl;
+	for (int r = 0; r < E.rows; r++) {
+		for (int c = 0; c < E.cols; c++) {
+			std::cout << E.at<double>(r, c) << " ";
+		}
+		std::cout << std::endl;
+	}
+
 	cv::Mat P1, P2;
 
 	this->getProjectionMatrices(E,
@@ -78,6 +104,22 @@ void SFM::SFMOperation() {
 		(cv::Mat)destination_points[inliers[0]],
 		P1,
 		P2);
+
+	std::cout << "First projection matrix:" << std::endl;
+	for (int r = 0; r < P1.rows; r++) {
+		for (int c = 0; c < P1.cols; c++) {
+			std::cout << P1.at<double>(r, c) << " ";
+		}
+		std::cout << std::endl;
+	}
+
+	std::cout << "Second projection matrix:" << std::endl;
+	for (int r = 0; r < P2.rows; r++) {
+		for (int c = 0; c < P2.cols; c++) {
+			std::cout << P2.at<double>(r, c) << " ";
+		}
+		std::cout << std::endl;
+	}
 
 	// Draw the points and the corresponding epipolar lines
 	constexpr double resize_by = 4.0;
@@ -145,6 +187,7 @@ void SFM::SFMOperation() {
 	cv::imwrite("Matches.png", out_image);
 	cv::imshow("Matches", out_image);
 }
+
 
 void SFM::FeatureMatching(cv::Mat& image1,
 	cv::Mat& image2,
@@ -467,14 +510,14 @@ cv::Mat SFM::checkEffectOfNormalization(const std::vector<cv::Point2d> &source_p
 
 	// Estimate the fundamental matrix from the original points
 	cv::Mat unnnormalized_fundamental_matrix(3, 3, CV_64F);
-	getFundamentalMatrixLSQ(
+	this->getFundamentalMatrixLSQ(
 		source_inliers,
 		destination_inliers,
 		unnnormalized_fundamental_matrix);
 
 	// Estimate the fundamental matrix from the normalized points
 	cv::Mat normalized_fundamental_matrix(3, 3, CV_64F);
-	getFundamentalMatrixLSQ(
+	this->getFundamentalMatrixLSQ(
 		normalized_source_inliers,
 		normalized_destination_inliers,
 		normalized_fundamental_matrix);

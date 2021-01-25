@@ -8,9 +8,9 @@
 
 int main(int argc, char** argv)
 {
-	if (argc < 3) {
-		std::cerr << "Looking for 2 inputs" << std::endl;
-		std::cerr << "Enter two images for stereo reconstruction" << std::endl;
+	if (argc < 4) {
+		std::cerr << "Looking for 3 inputs" << std::endl;
+		std::cerr << "Enter two images for stereo reconstruction and the corresponding matching feature points" << std::endl;
 		exit(0);
 	}
 
@@ -18,8 +18,11 @@ int main(int argc, char** argv)
 	cv::Mat image1, image2;
 	image1 = cv::imread(argv[1], 1);
 	image2 = cv::imread(argv[2], 1);
+	char* matchedFile;
+	matchedFile = argv[3];
+	cout << matchedFile << endl;
 
-	SFM sfm(image1, image2);
+	SFM sfm(image1, image2, matchedFile);
 
 	cv::waitKey(0);
 

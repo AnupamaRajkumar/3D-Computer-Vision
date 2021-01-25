@@ -9,15 +9,18 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
+#include "MatrixReaderWriter.h"
 
 
 class SFM {
 public:
-	SFM(cv::Mat &image1, cv::Mat &image2);
+	SFM(cv::Mat &image1, cv::Mat &image2, char* matchedFile);
 	void SFMOperation();
 
 private:
 	cv::Mat image1, image2;
+	char* matchedFile;
+
 	// Detecting point correspondences in two images
 	void FeatureMatching(cv::Mat& image1,
 						 cv::Mat& image2,
