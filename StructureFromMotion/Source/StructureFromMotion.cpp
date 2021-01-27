@@ -15,16 +15,17 @@ void SFM::SFMOperation() {
 	// Detect features
 	std::vector<cv::Point2d> source_points, destination_points; // Point correspondences
 	start = std::chrono::system_clock::now();
-
+#if 0
 	MatrixReaderWriter mtxrw = this->matchedFile;
 	for (int i = 0; i < mtxrw.columnNum; i++) {
 		source_points.push_back(cv::Point2d((double)mtxrw.data[i], (double)mtxrw.data[mtxrw.columnNum + i]));
-		destination_points.push_back(cv::Point2d((double)mtxrw.data[2 * mtxrw.columnNum + i], (double)mtxrw.data[3 * mtxrw.columnNum + i]));
+		destination_points.push_back(cv::Point2d((double)mtxrw.data[2 * mtxrw.columnNum + i], 
+									(double)mtxrw.data[3 * mtxrw.columnNum + i]));
 	}
-
-#if 0
-	this->FeatureMatching(this->image1, this->image2, source_points, destination_points);
 #endif
+//#if 0
+	this->FeatureMatching(this->image1, this->image2, source_points, destination_points);
+//#endif
 	end = std::chrono::system_clock::now();
 	printTimes(start, end, "feature detection");
 
@@ -53,7 +54,7 @@ void SFM::SFMOperation() {
 		F, // The fundamental matrix
 		inliers, // The inliers of the fundamental matrix
 		0.99999, // The required confidence in the results 
-		1.0); // The inlier-outlier threshold
+		10.0); // The inlier-outlier threshold
 	end = std::chrono::system_clock::now();
 	printTimes(start, end, "RANSAC");
 
@@ -271,6 +272,13 @@ void SFM::getProjectionMatrices(
 	rotation_1 = svd.u * w * svd.vt;
 	rotation_2 = svd.u * w.t() * svd.vt;
 	translation = svd.u.col(2) / cv::norm(svd.u.col(2));
+
+	if (cv::determinant(rotation_1) < 0) {
+		rotation_1 *= -1;
+	}
+	if (cv::determinant(rotation_2) < 0) {
+		rotation_2 *= -1;
+	}
 
 	// The possible solutions:
 	// (rotation_1, translation)
